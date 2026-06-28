@@ -1,0 +1,6 @@
+{
+  "name": "NutriTrack",
+  "description": "Pelacakan nutrisi presisi dengan kustomisasi menu makanan dinamis dan wawasan kesehatan cerdas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
