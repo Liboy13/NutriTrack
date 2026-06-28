@@ -67,6 +67,94 @@ class NutriTrackViewModel(application: Application) : AndroidViewModel(applicati
     private val _selectedCategory = MutableStateFlow("Semua")
     val selectedCategory = _selectedCategory.asStateFlow()
 
+    // Notification preferences state
+    private val _hydrationNotifEnabled = MutableStateFlow(sharedPrefs.getBoolean("notif_hydration", true))
+    val hydrationNotifEnabled = _hydrationNotifEnabled.asStateFlow()
+
+    private val _mealNotifEnabled = MutableStateFlow(sharedPrefs.getBoolean("notif_meals", true))
+    val mealNotifEnabled = _mealNotifEnabled.asStateFlow()
+
+    private val _insightNotifEnabled = MutableStateFlow(sharedPrefs.getBoolean("notif_insights", true))
+    val insightNotifEnabled = _insightNotifEnabled.asStateFlow()
+
+    val defaultAvatarUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuDOzcKaifVTFA6YcBZsTVW13IrrJEG9HFkm3PxOdpQLBke9KbXXAxRgJFY2BpG1QhE8Bz9FutDVW3gaIvAoQZqam7X_Nnvo9qvwwP3kDyPHS_ZSPvIizYLkO2P72GGeANffZWHFhSoeNsbj0Z_2Ra059ScIEuUZydtyhu30BHjxaydsCE7W0NsviK5MeLlJFBBZE_JuiRryRvsRVDcarQhzEjuGJdpdn7bgmKt-UM6YuevD79KYKk7DAzciD-fsZy8btNd3l_vIJfqY"
+
+    private val _avatarUrl = MutableStateFlow(sharedPrefs.getString("avatar_url", defaultAvatarUrl) ?: defaultAvatarUrl)
+    val avatarUrl = _avatarUrl.asStateFlow()
+
+    fun updateAvatarUrl(url: String) {
+        _avatarUrl.value = url
+        sharedPrefs.edit().putString("avatar_url", url).apply()
+    }
+
+    fun setHydrationNotifEnabled(enabled: Boolean) {
+        _hydrationNotifEnabled.value = enabled
+        sharedPrefs.edit().putBoolean("notif_hydration", enabled).apply()
+    }
+
+    fun setMealNotifEnabled(enabled: Boolean) {
+        _mealNotifEnabled.value = enabled
+        sharedPrefs.edit().putBoolean("notif_meals", enabled).apply()
+    }
+
+    fun setInsightNotifEnabled(enabled: Boolean) {
+        _insightNotifEnabled.value = enabled
+        sharedPrefs.edit().putBoolean("notif_insights", enabled).apply()
+    }
+
+    fun triggerDemoNotification(title: String, message: String) {
+        com.example.utils.NotificationHelper.sendNotification(getApplication(), title, message)
+    }
+
+    fun createCustomFoodItem(
+        name: String,
+        description: String,
+        category: String,
+        calories: Int,
+        protein: Int,
+        carbs: Int,
+        fat: Int,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (name.isBlank()) {
+            onError("Nama makanan tidak boleh kosong.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val newItem = FoodItem(
+                    id = "custom_" + java.util.UUID.randomUUID().toString(),
+                    name = name,
+                    description = description.ifBlank { "Makanan buatan pengguna." },
+                    category = category,
+                    calories = calories,
+                    protein = protein,
+                    carbs = carbs,
+                    fat = fat,
+                    imageUrl = URL_COFFEE,
+                    isPopular = false,
+                    rating = 5.0f
+                )
+                withContext(Dispatchers.IO) {
+                    foodItemRepository.insertFoodItem(newItem)
+                }
+                
+                if (mealNotifEnabled.value) {
+                    com.example.utils.NotificationHelper.sendNotification(
+                        getApplication(),
+                        "Menu Kustom Ditambahkan! 🍽️",
+                        "'$name' berhasil ditambahkan ke katalog pribadi Anda."
+                    )
+                }
+                
+                onSuccess()
+            } catch (e: Exception) {
+                onError("Gagal menambahkan item: ${e.message}")
+            }
+        }
+    }
+
     // Dynamic target limits based on logged-in user
     val targetCalories: Int
         get() = currentUser.value?.targetCalories ?: 2500
@@ -110,7 +198,8 @@ class NutriTrackViewModel(application: Application) : AndroidViewModel(applicati
             loadUserSession()
         }
 
-        // Seed mock data if database is empty on start
+        // Seed mock data if database is empty on start (Commented out to keep initial food empty on launch as per request)
+        /*
         viewModelScope.launch {
             allMeals.collect { meals ->
                 if (meals.isEmpty()) {
@@ -118,6 +207,7 @@ class NutriTrackViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
         }
+        */
 
         // Generate Health Insight when meals are updated
         viewModelScope.launch {
@@ -146,25 +236,23 @@ class NutriTrackViewModel(application: Application) : AndroidViewModel(applicati
                 )
             }
 
-            // Seed local food items catalog from Kotlin CATALOGUE list if empty
-            if (foodItemRepository.getCount() == 0) {
-                val dbFoods = CATALOGUE.map { item ->
-                    FoodItem(
-                        id = item.id,
-                        name = item.name,
-                        description = item.description,
-                        category = item.category,
-                        calories = item.calories,
-                        protein = item.protein,
-                        carbs = item.carbs,
-                        fat = item.fat,
-                        imageUrl = item.imageUrl,
-                        isPopular = item.isPopular,
-                        rating = item.rating
-                    )
-                }
-                foodItemRepository.insertFoodItems(dbFoods)
+            // Seed and synchronize local food items catalog from Kotlin CATALOGUE list
+            val dbFoods = CATALOGUE.map { item ->
+                FoodItem(
+                    id = item.id,
+                    name = item.name,
+                    description = item.description,
+                    category = item.category,
+                    calories = item.calories,
+                    protein = item.protein,
+                    carbs = item.carbs,
+                    fat = item.fat,
+                    imageUrl = item.imageUrl,
+                    isPopular = item.isPopular,
+                    rating = item.rating
+                )
             }
+            foodItemRepository.insertFoodItems(dbFoods)
         }
     }
 
@@ -220,6 +308,7 @@ class NutriTrackViewModel(application: Application) : AndroidViewModel(applicati
             _showExcessAlert.value = false
             _showDeficitAlert.value = false
             _healthInsight.value = "Belum ada makanan yang dicatat hari ini."
+            _avatarUrl.value = defaultAvatarUrl
 
             onSuccess()
         }
@@ -243,6 +332,60 @@ class NutriTrackViewModel(application: Application) : AndroidViewModel(applicati
                     userRepository.insertUser(newUser)
                 }
                 onSuccess()
+            }
+        }
+    }
+
+    fun updatePersonalInfo(newEmail: String, newPassword: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        val oldUser = _currentUser.value
+        if (oldUser == null) {
+            onError("User belum masuk.")
+            return
+        }
+        val oldEmail = oldUser.email
+
+        viewModelScope.launch {
+            if (newEmail.isBlank() || newPassword.isBlank()) {
+                onError("Email dan kata sandi tidak boleh kosong.")
+                return@launch
+            }
+            if (newEmail != oldEmail) {
+                val existing = withContext(Dispatchers.IO) {
+                    userRepository.getUserByEmail(newEmail)
+                }
+                if (existing != null) {
+                    onError("Email baru sudah terdaftar oleh pengguna lain.")
+                    return@launch
+                }
+            }
+
+            try {
+                withContext(Dispatchers.IO) {
+                    if (newEmail != oldEmail) {
+                        userRepository.deleteUserByEmail(oldEmail)
+                    }
+                    val updatedUser = User(
+                        email = newEmail,
+                        name = oldUser.name,
+                        targetCalories = oldUser.targetCalories,
+                        password = newPassword
+                    )
+                    userRepository.insertUser(updatedUser)
+                    _currentUser.value = updatedUser
+                    sharedPrefs.edit().putString("logged_in_email", newEmail).apply()
+                }
+                
+                if (mealNotifEnabled.value) {
+                    com.example.utils.NotificationHelper.sendNotification(
+                        getApplication(),
+                        "Informasi Personal Diperbarui! 👤",
+                        "Data akun Anda berhasil diperbarui di sistem NutriTrack."
+                    )
+                }
+                
+                onSuccess()
+            } catch (e: Exception) {
+                onError("Gagal memperbarui informasi: ${e.message}")
             }
         }
     }
@@ -372,9 +515,20 @@ class NutriTrackViewModel(application: Application) : AndroidViewModel(applicati
             val currentTotal = totalCalories.value
             if (currentTotal < 1800) {
                 _showDeficitAlert.value = true
+                if (insightNotifEnabled.value) {
+                    com.example.utils.NotificationHelper.sendNotification(
+                        getApplication(),
+                        "Peringatan Defisit Kalori! ⚠️",
+                        "Asupan kalori harian Anda baru mencapai $currentTotal kcal (target: 2500 kcal). Silakan makan atau catat hidangan berikutnya!"
+                    )
+                }
             } else {
-                // If they are over, show standard info
                 _showDeficitAlert.value = false
+                com.example.utils.NotificationHelper.sendNotification(
+                    getApplication(),
+                    "Status Kalori Optimal! 🎉",
+                    "Asupan kalori harian Anda sudah mencapai $currentTotal kcal. Nutrisi Anda tercukupi dengan baik!"
+                )
             }
         }
     }

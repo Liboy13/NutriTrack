@@ -2,21 +2,21 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val PrimaryBlue = Color(0xFF0052CC)
-val SecondaryGray = Color(0xFF475569) // Slate-600
-val TertiaryBrown = Color(0xFF7B2600)
+// High contrast monochrome dark colors with Purple Progress/Accents
+val PrimaryBlue = Color(0xFF9C27B0)       // Purple
+val SecondaryGray = Color(0xFF888888)     // Medium Grey
+val TertiaryBrown = Color(0xFF555555)     // Dark Grey
 
-val AppBackground = Color(0xFFF8FAFC) // Slate-50
-val AppSurface = Color(0xFFFFFFFF)
-val OnSurfaceText = Color(0xFF0F172A) // Slate-900
-val OnSurfaceVariantText = Color(0xFF64748B) // Slate-500
+val AppBackground = Color(0xFF000000)     // Deep Black
+val AppSurface = Color(0xFF121212)        // Charcoal Dark Grey (Cards, surfaces)
+val OnSurfaceText = Color(0xFFFFFFFF)     // Clean White Text
+val OnSurfaceVariantText = Color(0xFFEEEEEE) // Light Grey / Off-white Text
 
-val OutlineVariant = Color(0xFFE2E8F0) // Slate-200
-val ContainerLow = Color(0xFFF1F5F9) // Slate-100
-val ContainerHigh = Color(0xFFE2E8F0)
+val OutlineVariant = Color(0xFF333333)     // Charcoal borders
+val ContainerLow = Color(0xFF1E1E1E)       // Dark Grey Container
+val ContainerHigh = Color(0xFF2C2C2C)      // Medium Dark Grey Container
 
-val ProgressGreen = Color(0xFF10B981) // Emerald-500
-val ProgressOrange = Color(0xFFFB923C) // Orange-400
-val WarningRed = Color(0xFFEF4444) // Red-500
-val AccentBlue = Color(0xFF0052CC)
-
+val ProgressGreen = Color(0xFFBB86FC)      // Vibrant Purple for success/macros
+val ProgressOrange = Color(0xFF9C27B0)     // Deep Purple for macros
+val WarningRed = Color(0xFFCF6679)         // Light Red for deficit warning
+val AccentBlue = Color(0xFFBB86FC)         // Vibrant Purple Accent

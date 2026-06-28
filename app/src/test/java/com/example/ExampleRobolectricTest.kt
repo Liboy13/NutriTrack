@@ -18,4 +18,17 @@ class ExampleRobolectricTest {
     val appName = context.getString(R.string.app_name)
     assertEquals("NutriTrack", appName)
   }
+
+  @Test
+  fun `test send notification placing in manager`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    com.example.utils.NotificationHelper.sendNotification(context, "Test Title", "Test Message")
+    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+    
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        val channel = notificationManager.getNotificationChannel("nutritrack_reminders")
+        org.junit.Assert.assertNotNull(channel)
+        assertEquals("NutriTrack Pengingat", channel?.name)
+    }
+  }
 }

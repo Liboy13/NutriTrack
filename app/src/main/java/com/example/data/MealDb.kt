@@ -55,6 +55,9 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: User)
 
+    @Query("DELETE FROM users WHERE email = :email")
+    suspend fun deleteUserByEmail(email: String)
+
     @Query("SELECT * FROM users LIMIT 1")
     suspend fun getAnyUser(): User?
 }
@@ -66,6 +69,9 @@ interface FoodItemDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFoodItems(foods: List<FoodItem>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFoodItem(food: FoodItem)
 
     @Query("SELECT * FROM food_items WHERE name LIKE :query OR category LIKE :query")
     fun searchFoodItems(query: String): Flow<List<FoodItem>>
@@ -118,12 +124,14 @@ abstract class AppDatabase : RoomDatabase() {
 class UserRepository(private val userDao: UserDao) {
     suspend fun getUserByEmail(email: String): User? = userDao.getUserByEmail(email)
     suspend fun insertUser(user: User) = userDao.insertUser(user)
+    suspend fun deleteUserByEmail(email: String) = userDao.deleteUserByEmail(email)
     suspend fun getAnyUser(): User? = userDao.getAnyUser()
 }
 
 class FoodItemRepository(private val foodItemDao: FoodItemDao) {
     val allFoodItems: Flow<List<FoodItem>> = foodItemDao.getAllFoodItems()
     suspend fun insertFoodItems(foods: List<FoodItem>) = foodItemDao.insertFoodItems(foods)
+    suspend fun insertFoodItem(food: FoodItem) = foodItemDao.insertFoodItem(food)
     suspend fun getCount(): Int = foodItemDao.getCount()
     fun searchFoodItems(query: String): Flow<List<FoodItem>> = foodItemDao.searchFoodItems("%$query%")
 }

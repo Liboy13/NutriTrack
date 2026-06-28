@@ -1,5 +1,7 @@
 package com.example.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -70,9 +72,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -95,6 +99,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -226,6 +232,54 @@ val CATALOGUE = listOf(
         fat = 5,
         imageUrl = URL_COFFEE,
         rating = 4.4f
+    ),
+    CatalogueItem(
+        id = "es_kelapa",
+        name = "Es Kelapa Muda",
+        description = "Air kelapa muda segar penambah hidrasi alami dengan daging kelapa lembut.",
+        category = "Minuman",
+        calories = 80,
+        protein = 1,
+        carbs = 19,
+        fat = 1,
+        imageUrl = URL_COFFEE,
+        rating = 4.9f
+    ),
+    CatalogueItem(
+        id = "jus_alpukat",
+        name = "Jus Alpukat Susu",
+        description = "Jus alpukat mentega segar yang kental dengan topping kental manis cokelat.",
+        category = "Minuman",
+        calories = 230,
+        protein = 3,
+        carbs = 28,
+        fat = 14,
+        imageUrl = URL_YOGURT,
+        rating = 4.8f
+    ),
+    CatalogueItem(
+        id = "whey_shake",
+        name = "Susu Whey Protein",
+        description = "Minuman whey protein konsentrat rasa cokelat lezat untuk pemulihan otot.",
+        category = "Minuman",
+        calories = 140,
+        protein = 25,
+        carbs = 3,
+        fat = 2,
+        imageUrl = URL_COFFEE,
+        rating = 4.7f
+    ),
+    CatalogueItem(
+        id = "jus_jeruk",
+        name = "Jus Jeruk Peras Murni",
+        description = "Perasan jeruk manis segar kaya Vitamin C tanpa pemanis buatan.",
+        category = "Minuman",
+        calories = 110,
+        protein = 2,
+        carbs = 25,
+        fat = 0,
+        imageUrl = URL_COFFEE,
+        rating = 4.6f
     ),
     CatalogueItem(
         id = "greek_yogurt",
@@ -493,6 +547,7 @@ fun HomeScreen(
 
     val currentUser by viewModel.currentUser.collectAsState()
     val userName = currentUser?.name ?: "Al Amin Abdilah"
+    val avatarUrl by viewModel.avatarUrl.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -529,34 +584,35 @@ fun HomeScreen(
                             style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                             color = OnSurfaceVariantText
                         )
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0xFFFEF3C7), RoundedCornerShape(50))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "PREMIUM",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFB45309),
-                                letterSpacing = 0.5.sp
-                            )
-                        }
                     }
                 }
-                IconButton(
-                    onClick = { /* Simulated trigger */ },
-                    modifier = Modifier
-                        .background(
-                            ContainerLow,
-                            CircleShape
-                        )
-                        .testTag("btn_notifications")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = "Notifikasi",
-                        tint = MaterialTheme.colorScheme.primary
+                    IconButton(
+                        onClick = { /* Simulated trigger */ },
+                        modifier = Modifier
+                            .background(
+                                ContainerLow,
+                                CircleShape
+                            )
+                            .testTag("btn_notifications")
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = "Notifikasi",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = "Profil",
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                        contentScale = ContentScale.Crop
                     )
                 }
             }
@@ -1015,11 +1071,233 @@ fun SearchScreen(
 
     val categories = listOf("Semua", "Indonesia", "Western", "Minuman", "Sehat")
 
-    val filteredItems = CATALOGUE.filter { item ->
+    val localFoods by viewModel.localFoodItems.collectAsState()
+    val filteredItems = localFoods.filter { item ->
         val matchesQuery = item.name.contains(query, ignoreCase = true) ||
                 item.description.contains(query, ignoreCase = true)
         val matchesCategory = selectedCategory == "Semua" || item.category == selectedCategory
         matchesQuery && matchesCategory
+    }
+
+    var showAddCustomDialog by remember { mutableStateOf(false) }
+
+    if (showAddCustomDialog) {
+        var customName by remember { mutableStateOf("") }
+        var customDesc by remember { mutableStateOf("") }
+        var customCat by remember { mutableStateOf("Indonesia") }
+        var customKcal by remember { mutableStateOf("") }
+        var customProtein by remember { mutableStateOf("") }
+        var customCarbs by remember { mutableStateOf("") }
+        var customFat by remember { mutableStateOf("") }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
+
+        Dialog(onDismissRequest = { showAddCustomDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, OutlineVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Tambah Menu Kustom Baru",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSurfaceText
+                    )
+                    Text(
+                        text = "Kreasikan makanan atau minuman favorit Anda dan simpan ke database.",
+                        fontSize = 12.sp,
+                        color = OnSurfaceVariantText
+                    )
+
+                    if (errorMessage != null) {
+                        Text(
+                            text = errorMessage!!,
+                            color = WarningRed,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = customName,
+                        onValueChange = { customName = it },
+                        label = { Text("Nama Makanan / Minuman", color = OnSurfaceVariantText) },
+                        modifier = Modifier.fillMaxWidth().testTag("custom_name_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnSurfaceText,
+                            unfocusedTextColor = OnSurfaceText,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = OutlineVariant
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = customDesc,
+                        onValueChange = { customDesc = it },
+                        label = { Text("Deskripsi Singkat", color = OnSurfaceVariantText) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnSurfaceText,
+                            unfocusedTextColor = OnSurfaceText,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = OutlineVariant
+                        )
+                    )
+
+                    Text(
+                        text = "Kategori",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = OnSurfaceText
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Indonesia", "Western", "Minuman", "Sehat").forEach { cat ->
+                            val isSelected = customCat == cat
+                            Surface(
+                                onClick = { customCat = cat },
+                                shape = RoundedCornerShape(50),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else ContainerLow,
+                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else OnSurfaceVariantText,
+                                border = if (isSelected) null else BorderStroke(1.dp, OutlineVariant)
+                            ) {
+                                Text(
+                                    text = cat,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = customKcal,
+                            onValueChange = { if (it.isEmpty() || it.all { char -> char.isDigit() }) customKcal = it },
+                            label = { Text("Kalori (kcal)", color = OnSurfaceVariantText, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = OnSurfaceText,
+                                unfocusedTextColor = OnSurfaceText,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = OutlineVariant
+                            )
+                        )
+                        OutlinedTextField(
+                            value = customProtein,
+                            onValueChange = { if (it.isEmpty() || it.all { char -> char.isDigit() }) customProtein = it },
+                            label = { Text("Protein (g)", color = OnSurfaceVariantText, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = OnSurfaceText,
+                                unfocusedTextColor = OnSurfaceText,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = OutlineVariant
+                            )
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = customCarbs,
+                            onValueChange = { if (it.isEmpty() || it.all { char -> char.isDigit() }) customCarbs = it },
+                            label = { Text("Karbo (g)", color = OnSurfaceVariantText, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = OnSurfaceText,
+                                unfocusedTextColor = OnSurfaceText,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = OutlineVariant
+                            )
+                        )
+                        OutlinedTextField(
+                            value = customFat,
+                            onValueChange = { if (it.isEmpty() || it.all { char -> char.isDigit() }) customFat = it },
+                            label = { Text("Lemak (g)", color = OnSurfaceVariantText, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = OnSurfaceText,
+                                unfocusedTextColor = OnSurfaceText,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = OutlineVariant
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { showAddCustomDialog = false }) {
+                            Text("Batal", color = OnSurfaceVariantText, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (customName.isBlank()) {
+                                    errorMessage = "Nama makanan tidak boleh kosong"
+                                    return@Button
+                                }
+                                val kcal = customKcal.toIntOrNull() ?: 0
+                                val prot = customProtein.toIntOrNull() ?: 0
+                                val carbs = customCarbs.toIntOrNull() ?: 0
+                                val fat = customFat.toIntOrNull() ?: 0
+
+                                viewModel.createCustomFoodItem(
+                                    name = customName,
+                                    description = customDesc,
+                                    category = customCat,
+                                    calories = kcal,
+                                    protein = prot,
+                                    carbs = carbs,
+                                    fat = fat,
+                                    onSuccess = {
+                                        showAddCustomDialog = false
+                                    },
+                                    onError = {
+                                        errorMessage = it
+                                    }
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Simpan Menu", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Column(
@@ -1051,6 +1329,15 @@ fun SearchScreen(
                 color = OnSurfaceText,
                 letterSpacing = (-0.5).sp
             )
+            Spacer(modifier = Modifier.weight(1f))
+            TextButton(
+                onClick = { showAddCustomDialog = true },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Kustom", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
         }
 
         // Search Input
@@ -1153,7 +1440,7 @@ fun SearchScreen(
                             )
                             if (item.isPopular) {
                                 Surface(
-                                    color = Color(0xFFFEF3C7),
+                                    color = MaterialTheme.colorScheme.primary,
                                     shape = RoundedCornerShape(6.dp),
                                     modifier = Modifier
                                         .padding(4.dp)
@@ -1163,7 +1450,7 @@ fun SearchScreen(
                                         text = "POPULER",
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFB45309),
+                                        color = Color.White,
                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                     )
                                 }
@@ -1212,7 +1499,7 @@ fun SearchScreen(
                                     Icon(
                                         imageVector = Icons.Default.CheckCircle,
                                         contentDescription = "Rating",
-                                        tint = Color(0xFFFBC02D),
+                                        tint = Color(0xFF555555),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -1425,12 +1712,12 @@ fun CustomizationScreen(
                     )
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFEF3C7), RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
                             .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "TINGGI PROTEIN",
-                            color = Color(0xFFB45309),
+                            color = Color.White,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
@@ -1693,6 +1980,300 @@ fun ProfileScreen(viewModel: NutriTrackViewModel, onLogout: () -> Unit) {
     val userName = currentUser?.name ?: "Al Amin Abdilah"
     val targetCalories = currentUser?.targetCalories ?: 2500
 
+    val avatarUrl by viewModel.avatarUrl.collectAsState()
+    var showAvatarSelection by remember { mutableStateOf(false) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            viewModel.updateAvatarUrl(it.toString())
+            showAvatarSelection = false
+        }
+    }
+
+    if (showAvatarSelection) {
+        var inputUrl by remember { mutableStateOf("") }
+        val presets = listOf(
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
+            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
+            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200"
+        )
+
+        Dialog(onDismissRequest = { showAvatarSelection = false }) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, OutlineVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Ganti Foto Profil",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSurfaceText
+                    )
+                    Text(
+                        text = "Pilih dari foto beresolusi tinggi di bawah ini, unggah dari galeri telepon Anda, atau masukkan tautan URL gambar kustom Anda.",
+                        fontSize = 12.sp,
+                        color = OnSurfaceVariantText
+                    )
+
+                    // Gallery Selection Button
+                    Button(
+                        onClick = {
+                            galleryLauncher.launch("image/*")
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp).testTag("select_gallery_button"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Pilih dari Galeri Telepon 📸", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+
+                    Text(
+                        text = "Atau pilih avatar bawaan:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSurfaceVariantText,
+                        letterSpacing = 0.5.sp
+                    )
+
+                    // Presets Grid
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        presets.forEach { preset ->
+                            val isSelected = avatarUrl == preset
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else OutlineVariant,
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        viewModel.updateAvatarUrl(preset)
+                                        showAvatarSelection = false
+                                    }
+                            ) {
+                                AsyncImage(
+                                    model = preset,
+                                    contentDescription = "Pilihan Avatar",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = inputUrl,
+                        onValueChange = { inputUrl = it },
+                        label = { Text("Tautan URL Gambar Kustom", color = OnSurfaceVariantText) },
+                        modifier = Modifier.fillMaxWidth().testTag("custom_avatar_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnSurfaceText,
+                            unfocusedTextColor = OnSurfaceText,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = OutlineVariant
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showAvatarSelection = false }) {
+                            Text("Batal", color = OnSurfaceVariantText, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (inputUrl.isNotBlank()) {
+                                    viewModel.updateAvatarUrl(inputUrl.trim())
+                                }
+                                showAvatarSelection = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Terapkan", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    var showPersonalInfoDialog by remember { mutableStateOf(false) }
+
+    if (showPersonalInfoDialog) {
+        val context = LocalContext.current
+        var newEmail by remember { mutableStateOf(currentUser?.email ?: "") }
+        var newPassword by remember { mutableStateOf(currentUser?.password ?: "") }
+        var personalInfoError by remember { mutableStateOf<String?>(null) }
+
+        Dialog(onDismissRequest = { showPersonalInfoDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, OutlineVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Informasi Personal 👤",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSurfaceText
+                    )
+                    Text(
+                        text = "Kelola dan ganti email, kata sandi, serta foto profil Anda.",
+                        fontSize = 12.sp,
+                        color = OnSurfaceVariantText
+                    )
+
+                    // Profile Photo Change Section
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(ContainerLow, RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, OutlineVariant, CircleShape)
+                        ) {
+                            AsyncImage(
+                                model = avatarUrl,
+                                contentDescription = "Foto Profil",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Foto Profil Anda",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnSurfaceText
+                            )
+                            Text(
+                                text = "Ganti gambar avatar Anda",
+                                fontSize = 11.sp,
+                                color = OnSurfaceVariantText
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                showAvatarSelection = true
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("Ganti", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Email field
+                    OutlinedTextField(
+                        value = newEmail,
+                        onValueChange = { newEmail = it },
+                        label = { Text("Ganti Email", color = OnSurfaceVariantText) },
+                        modifier = Modifier.fillMaxWidth().testTag("personal_email_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnSurfaceText,
+                            unfocusedTextColor = OnSurfaceText,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = OutlineVariant
+                        )
+                    )
+
+                    // Password field
+                    OutlinedTextField(
+                        value = newPassword,
+                        onValueChange = { newPassword = it },
+                        label = { Text("Ganti Kata Sandi", color = OnSurfaceVariantText) },
+                        modifier = Modifier.fillMaxWidth().testTag("personal_password_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnSurfaceText,
+                            unfocusedTextColor = OnSurfaceText,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = OutlineVariant
+                        )
+                    )
+
+                    if (personalInfoError != null) {
+                        Text(
+                            text = personalInfoError ?: "",
+                            color = WarningRed,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showPersonalInfoDialog = false }) {
+                            Text("Batal", color = OnSurfaceVariantText, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                personalInfoError = null
+                                viewModel.updatePersonalInfo(
+                                    newEmail = newEmail.trim(),
+                                    newPassword = newPassword,
+                                    onSuccess = {
+                                        android.widget.Toast.makeText(context, "Informasi personal berhasil diperbarui!", android.widget.Toast.LENGTH_SHORT).show()
+                                        showPersonalInfoDialog = false
+                                    },
+                                    onError = { err ->
+                                        personalInfoError = err
+                                    }
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Simpan", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1737,9 +2318,14 @@ fun ProfileScreen(viewModel: NutriTrackViewModel, onLogout: () -> Unit) {
                     .padding(vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(contentAlignment = Alignment.BottomEnd) {
+                Box(
+                    contentAlignment = Alignment.BottomEnd,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { showAvatarSelection = true }
+                ) {
                     AsyncImage(
-                        model = URL_AVATAR,
+                        model = avatarUrl,
                         contentDescription = "Avatar $userName",
                         modifier = Modifier
                             .size(100.dp)
@@ -1769,24 +2355,6 @@ fun ProfileScreen(viewModel: NutriTrackViewModel, onLogout: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     color = OnSurfaceText
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "Premium Status",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Premium Member",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
                 Text(
                     text = "Target Gizi: ${java.text.NumberFormat.getIntegerInstance(java.util.Locale("id", "ID")).format(targetCalories)} kcal/hari",
                     fontSize = 13.sp,
@@ -1796,88 +2364,7 @@ fun ProfileScreen(viewModel: NutriTrackViewModel, onLogout: () -> Unit) {
             }
         }
 
-        // Health Snapshot Title
-        item {
-            Text(
-                text = "Snapshot Kesehatan",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = OnSurfaceText
-            )
-        }
 
-        // Health Cards row
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Weight Card
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, OutlineVariant),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Berat Badan", 
-                            fontSize = 11.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = OnSurfaceVariantText,
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "78.5 kg",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OnSurfaceText
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "↓ -0.4 kg",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = ProgressGreen
-                        )
-                    }
-                }
-
-                // BMI Card
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, OutlineVariant),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "BMI", 
-                            fontSize = 11.sp, 
-                            fontWeight = FontWeight.Bold, 
-                            color = OnSurfaceVariantText,
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "23.4",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OnSurfaceText
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Rentang Normal",
-                            fontSize = 12.sp,
-                            color = OnSurfaceVariantText
-                        )
-                    }
-                }
-            }
-        }
 
         // Weekly Avg Card
         item {
@@ -1956,12 +2443,12 @@ fun ProfileScreen(viewModel: NutriTrackViewModel, onLogout: () -> Unit) {
                         }
                         Box(
                             modifier = Modifier
-                                .background(Color(0xFFDBEAFE), RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "GEMINI AI",
-                                color = Color(0xFF1E40AF),
+                                color = Color.White,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.5.sp
@@ -2000,6 +2487,79 @@ fun ProfileScreen(viewModel: NutriTrackViewModel, onLogout: () -> Unit) {
             }
         }
 
+        // Notification Settings Section
+        item {
+            Text(
+                text = "Pengaturan Notifikasi Mobile",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = OnSurfaceText,
+                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+            )
+        }
+
+        item {
+            val hydrationEnabled by viewModel.hydrationNotifEnabled.collectAsState()
+            val mealEnabled by viewModel.mealNotifEnabled.collectAsState()
+            val insightEnabled by viewModel.insightNotifEnabled.collectAsState()
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, OutlineVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column {
+                    SettingsSwitchItem(
+                        title = "Pengingat Hidrasi",
+                        subtitle = "Notifikasi pengingat minum air agar tetap terhidrasi",
+                        icon = Icons.Default.Notifications,
+                        checked = hydrationEnabled,
+                        onCheckedChange = { viewModel.setHydrationNotifEnabled(it) }
+                    )
+                    SettingsSwitchItem(
+                        title = "Peringatan Catat Makan",
+                        subtitle = "Mengingatkan Anda mencatat sarapan, siang, & malam",
+                        icon = Icons.Default.Edit,
+                        checked = mealEnabled,
+                        onCheckedChange = { viewModel.setMealNotifEnabled(it) }
+                    )
+                    SettingsSwitchItem(
+                        title = "Pemberitahuan Analisis Gizi",
+                        subtitle = "Notifikasi analisis kecukupan gizi dari Gemini AI",
+                        icon = Icons.Default.Info,
+                        checked = insightEnabled,
+                        onCheckedChange = { viewModel.setInsightNotifEnabled(it) }
+                    )
+                    
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(OutlineVariant))
+                    
+                    Button(
+                        onClick = {
+                            viewModel.triggerDemoNotification(
+                                "NutriTrack Pengingat Hidrasi 💧",
+                                "Waktunya minum air! Target hidrasi harian Anda membantu menjaga metabolisme tubuh tetap presisi."
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = null
+                    ) {
+                        Icon(imageVector = Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Uji Kirim Notifikasi Demo", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         // Account Settings List
         item {
             Text(
@@ -2023,7 +2583,8 @@ fun ProfileScreen(viewModel: NutriTrackViewModel, onLogout: () -> Unit) {
                     SettingsListItem(
                         title = "Informasi Personal",
                         subtitle = "Kelola data pribadi dan privasi Anda",
-                        icon = Icons.Default.Person
+                        icon = Icons.Default.Person,
+                        onClick = { showPersonalInfoDialog = true }
                     )
                     SettingsListItem(
                         title = "Simulasi Cek Pukul 20:00",
@@ -2116,6 +2677,64 @@ fun SettingsListItem(
     }
 }
 
+@Composable
+fun SettingsSwitchItem(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(ContainerLow, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = title, 
+                    fontWeight = FontWeight.SemiBold, 
+                    fontSize = 15.sp,
+                    color = OnSurfaceText
+                )
+                Text(
+                    text = subtitle, 
+                    fontSize = 12.sp, 
+                    color = OnSurfaceVariantText
+                )
+            }
+        }
+        androidx.compose.material3.Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = androidx.compose.material3.SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = OnSurfaceVariantText,
+                uncheckedTrackColor = ContainerLow
+            )
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -2171,7 +2790,7 @@ fun LoginScreen(
             }
 
             Text(
-                text = "Precision nutrition management.",
+                text = "Manajemen gizi presisi.",
                 fontSize = 14.sp,
                 color = OnSurfaceVariantText,
                 textAlign = TextAlign.Center
@@ -2191,14 +2810,14 @@ fun LoginScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = if (isSignUpMode) "Daftar Akun Baru" else "Welcome Back",
+                        text = if (isSignUpMode) "Daftar Akun Baru" else "Selamat Datang Kembali",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = OnSurfaceText
                     )
 
                     Text(
-                        text = if (isSignUpMode) "Masukkan data Anda untuk memulai pemantauan gizi presisi." else "Enter your credentials to access your dashboard.",
+                        text = if (isSignUpMode) "Masukkan data Anda untuk memulai pemantauan gizi presisi." else "Masukkan kredensial Anda untuk masuk ke dasbor.",
                         fontSize = 13.sp,
                         color = OnSurfaceVariantText,
                         lineHeight = 18.sp
@@ -2255,6 +2874,8 @@ fun LoginScreen(
                             modifier = Modifier.fillMaxWidth().testTag("signup_name_input"),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = OnSurfaceText,
+                                unfocusedTextColor = OnSurfaceText,
                                 focusedBorderColor = PrimaryBlue,
                                 unfocusedBorderColor = OutlineVariant,
                                 focusedContainerColor = AppBackground,
@@ -2279,6 +2900,8 @@ fun LoginScreen(
                             modifier = Modifier.fillMaxWidth().testTag("signup_target_input"),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = OnSurfaceText,
+                                unfocusedTextColor = OnSurfaceText,
                                 focusedBorderColor = PrimaryBlue,
                                 unfocusedBorderColor = OutlineVariant,
                                 focusedContainerColor = AppBackground,
@@ -2290,7 +2913,7 @@ fun LoginScreen(
 
                     // Email Field
                     Text(
-                        text = "EMAIL ADDRESS",
+                        text = "ALAMAT EMAIL",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = OnSurfaceVariantText,
@@ -2304,6 +2927,8 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth().testTag("email_input"),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnSurfaceText,
+                            unfocusedTextColor = OnSurfaceText,
                             focusedBorderColor = PrimaryBlue,
                             unfocusedBorderColor = OutlineVariant,
                             focusedContainerColor = AppBackground,
@@ -2319,7 +2944,7 @@ fun LoginScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "PASSWORD",
+                            text = "KATA SANDI",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = OnSurfaceVariantText,
@@ -2327,7 +2952,7 @@ fun LoginScreen(
                         )
                         if (!isSignUpMode) {
                             Text(
-                                text = "Forgot Password?",
+                                text = "Lupa Kata Sandi?",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = PrimaryBlue,
@@ -2345,6 +2970,8 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth().testTag("password_input"),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnSurfaceText,
+                            unfocusedTextColor = OnSurfaceText,
                             focusedBorderColor = PrimaryBlue,
                             unfocusedBorderColor = OutlineVariant,
                             focusedContainerColor = AppBackground,
@@ -2367,7 +2994,7 @@ fun LoginScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Keep me logged in",
+                                text = "Tetap masuk",
                                 fontSize = 13.sp,
                                 color = OnSurfaceVariantText
                             )
@@ -2411,7 +3038,7 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = if (isSignUpMode) "Daftar" else "Sign In",
+                            text = if (isSignUpMode) "Daftar" else "Masuk",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -2427,61 +3054,7 @@ fun LoginScreen(
                 }
             }
 
-            // Social Divider & Buttons (Only on Login Mode for visual match)
-            if (!isSignUpMode) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.weight(1f).height(1.dp).background(OutlineVariant))
-                    Text(
-                        text = "OR CONTINUE WITH",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OnSurfaceVariantText,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        letterSpacing = 0.5.sp
-                    )
-                    Box(modifier = Modifier.weight(1f).height(1.dp).background(OutlineVariant))
-                }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Google Mock Button
-                    OutlinedButton(
-                        onClick = { errorMessage = "Login Sosial disimulasikan. Silakan login menggunakan Akun Utama: amin13dpk@gmail.com / password123." },
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, OutlineVariant),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OnSurfaceText)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text("Google", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    // Apple Mock Button
-                    OutlinedButton(
-                        onClick = { errorMessage = "Login Sosial disimulasikan. Silakan login menggunakan Akun Utama: amin13dpk@gmail.com / password123." },
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, OutlineVariant),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OnSurfaceText)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text("Apple", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
 
             // Footer Info
             Column(
@@ -2493,13 +3066,13 @@ fun LoginScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isSignUpMode) "Sudah punya akun?" else "Don't have an account yet?",
+                        text = if (isSignUpMode) "Sudah punya akun?" else "Belum memiliki akun?",
                         fontSize = 13.sp,
                         color = OnSurfaceVariantText
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isSignUpMode) "Sign In" else "Sign Up",
+                        text = if (isSignUpMode) "Masuk" else "Daftar",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = PrimaryBlue,
@@ -2515,13 +3088,13 @@ fun LoginScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "Privacy Policy",
+                        text = "Kebijakan Privasi",
                         fontSize = 12.sp,
                         color = OnSurfaceVariantText,
                         modifier = Modifier.clickable { /* Simulate */ }
                     )
                     Text(
-                        text = "Terms of Service",
+                        text = "Ketentuan Layanan",
                         fontSize = 12.sp,
                         color = OnSurfaceVariantText,
                         modifier = Modifier.clickable { /* Simulate */ }
